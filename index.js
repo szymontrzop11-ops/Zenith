@@ -17,11 +17,16 @@ try {
     ticketCategoryId: process.env.TICKET_CATEGORY_ID,
     ticketSupportRoleId: process.env.TICKET_SUPPORT_ROLE_ID,
     welcomeChannelId: process.env.WELCOME_CHANNEL_ID,
-    rulesChannelId: process.env.RULES_CHANNEL_ID
+    rulesChannelId: process.env.RULES_CHANNEL_ID,
+    reactionRolesChannelId: process.env.REACTION_ROLES_CHANNEL_ID,
+    reactionRole1Id: process.env.REACTION_ROLE_1_ID,
+    reactionRole2Id: process.env.REACTION_ROLE_2_ID,
+    reactionRole3Id: process.env.REACTION_ROLE_3_ID,
+    reactionRole4Id: process.env.REACTION_ROLE_4_ID
   };
 }
 
-const { token, logsChannelId, ticketPanelChannelId, ticketTranscriptsChannelId, ticketCategoryId, ticketSupportRoleId, welcomeChannelId, rulesChannelId } = config;
+const { token, logsChannelId, ticketPanelChannelId, ticketTranscriptsChannelId, ticketCategoryId, ticketSupportRoleId, welcomeChannelId, rulesChannelId, reactionRolesChannelId, reactionRole1Id, reactionRole2Id, reactionRole3Id, reactionRole4Id } = config;
 
 const welcomedMembers = new Set(); // To prevent duplicate welcomes
 const automodDeletedMessages = new Set(); // To prevent duplicate message delete logs from automod
@@ -1191,6 +1196,127 @@ client.on('interactionCreate', async (interaction) => {
           ],
         });
       }
+
+      if (commandName === 'reactionroles') {
+        if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+          const msg = await interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor('#ff0000')
+                .setDescription('You do not have permission to use this command!'),
+            ],
+            ephemeral: true,
+            fetchReply: true,
+          });
+          setTimeout(() => msg.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        const channel = guild.channels.cache.get(reactionRolesChannelId);
+        if (!channel) {
+          const msg = await interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor('#ff0000')
+                .setDescription('Reaction roles channel not found! Please check config.json!'),
+            ],
+            ephemeral: true,
+            fetchReply: true,
+          });
+          setTimeout(() => msg.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // Delete old messages in reaction roles channel
+        let deleted = 0;
+        let messages;
+        do {
+          messages = await channel.messages.fetch({ limit: 100 });
+          if (messages.size > 0) {
+            await channel.bulkDelete(messages, true);
+            deleted += messages.size;
+          }
+        } while (messages.size === 100);
+
+        // Create reaction roles embed
+        const reactionRolesEmbed = new EmbedBuilder()
+          .setColor('#e600ff')
+          .setTitle('🎭 Get Your Roles!')
+          .setDescription('Click the buttons below to get roles! Once claimed, roles are permanent!');
+
+        // Create buttons
+        const buttonRow1 = new ActionRowBuilder();
+        const buttonRow2 = new ActionRowBuilder();
+
+        // Add role 1 button if configured
+        if (reactionRole1Id) {
+          const role1 = guild.roles.cache.get(reactionRole1Id);
+          if (role1) {
+            buttonRow1.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`reaction_role_1`)
+                .setLabel(role1.name)
+                .setStyle(ButtonStyle.Secondary)
+            );
+          }
+        }
+
+        // Add role 2 button if configured
+        if (reactionRole2Id) {
+          const role2 = guild.roles.cache.get(reactionRole2Id);
+          if (role2) {
+            buttonRow1.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`reaction_role_2`)
+                .setLabel(role2.name)
+                .setStyle(ButtonStyle.Secondary)
+            );
+          }
+        }
+
+        // Add role 3 button if configured
+        if (reactionRole3Id) {
+          const role3 = guild.roles.cache.get(reactionRole3Id);
+          if (role3) {
+            buttonRow2.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`reaction_role_3`)
+                .setLabel(role3.name)
+                .setStyle(ButtonStyle.Secondary)
+            );
+          }
+        }
+
+        // Add role 4 button if configured
+        if (reactionRole4Id) {
+          const role4 = guild.roles.cache.get(reactionRole4Id);
+          if (role4) {
+            buttonRow2.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`reaction_role_4`)
+                .setLabel(role4.name)
+                .setStyle(ButtonStyle.Secondary)
+            );
+          }
+        }
+
+        // Build components array
+        const components = [];
+        if (buttonRow1.components.length > 0) components.push(buttonRow1);
+        if (buttonRow2.components.length > 0) components.push(buttonRow2);
+
+        await channel.send({ embeds: [reactionRolesEmbed], components });
+
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor('#00ff00')
+              .setDescription(`Reaction roles panel sent! Deleted ${deleted} old messages!`),
+          ],
+        });
+      }
     } catch (error) {
       console.error(error);
       const msg = await interaction.reply({
@@ -1366,6 +1492,72 @@ client.on('interactionCreate', async (interaction) => {
           new EmbedBuilder()
             .setColor('#00ff00')
             .setDescription('Ticket will stay open!'),
+        ],
+      });
+    }
+
+    // Handle reaction role buttons
+    if (customId.startsWith('reaction_role_')) {
+      await interaction.deferReply({ ephemeral: true });
+      
+      const roleNumber = customId.split('_')[2];
+      let roleId;
+      
+      // Get the role ID based on the button
+      switch (roleNumber) {
+        case '1':
+          roleId = reactionRole1Id;
+          break;
+        case '2':
+          roleId = reactionRole2Id;
+          break;
+        case '3':
+          roleId = reactionRole3Id;
+          break;
+        case '4':
+          roleId = reactionRole4Id;
+          break;
+      }
+      
+      if (!roleId) {
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor('#ff0000')
+              .setDescription('This role is not configured!'),
+          ],
+        });
+      }
+      
+      const role = guild.roles.cache.get(roleId);
+      if (!role) {
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor('#ff0000')
+              .setDescription('Role not found!'),
+          ],
+        });
+      }
+      
+      // Check if user already has the role
+      if (member.roles.cache.has(roleId)) {
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor('#ffff00')
+              .setDescription(`You already have the ${role.name} role and can't remove it!`),
+          ],
+        });
+      }
+      
+      // Add the role (can't remove it once added)
+      await member.roles.add(roleId);
+      return interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('#00ff00')
+            .setDescription(`Added the ${role.name} role! You now have this role permanently!`),
         ],
       });
     }

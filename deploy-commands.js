@@ -184,6 +184,11 @@ const commands = [
     description: 'Send the rules embed in the rules channel',
     default_member_permissions: '8', // Administrator
   },
+  {
+    name: 'reactionroles',
+    description: 'Send the reaction roles panel to the configured channel',
+    default_member_permissions: '8', // Administrator permission
+  },
 ];
 
 const rest = new REST({ version: '10' }).setToken(token);
